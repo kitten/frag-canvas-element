@@ -25,6 +25,9 @@ const makeDateVector = () => {
   return [year, month, day, time] as const;
 };
 
+const isImageElement = (tex: TexImageSource): tex is HTMLImageElement =>
+  (tex as Element).tagName === 'IMG';
+
 const preprocessShader = (source: string) => {
   let header = '';
   let output = source.trim();
@@ -126,6 +129,7 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
 
   let frameCount = 0;
   let prevTimestamp: DOMHighResTimeStamp;
+  let prevSource: string | null;
 
   const state = {
     draw(source: TexImageSource, timestamp: DOMHighResTimeStamp) {
@@ -133,7 +137,23 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
 
       gl.useProgram(program);
 
-      if (source) {
+      if (isImageElement(source)) {
+        if (source.complete) {
+          const { currentSrc } = source;
+          if (prevSource !== currentSrc) {
+            prevSource = currentSrc;
+            gl.texImage2D(
+              gl.TEXTURE_2D,
+              0,
+              gl.RGBA,
+              gl.RGBA,
+              gl.UNSIGNED_BYTE,
+              source
+            );
+          }
+        }
+      } else if (source) {
+        prevSource = null;
         gl.texImage2D(
           gl.TEXTURE_2D,
           0,
@@ -145,6 +165,7 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
         if (iChannelResolution)
           gl.uniform3fv(iChannelResolution, [width, height, 0]);
       } else {
+        prevSource = null;
         if (iChannelResolution) gl.uniform3fv(iChannelResolution, [0, 0, 0]);
       }
 
