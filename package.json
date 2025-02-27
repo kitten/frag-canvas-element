@@ -3,7 +3,7 @@
   "sideEffects": true,
   "description": "A frag-canvas custom element to apply fragment shaders to a canvas or image/video element",
   "author": "Phil Pluckthun <phil@kitten.sh>",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "source": "./src/index.ts",
   "main": "./dist/minifetch",
   "module": "./dist/minifetch.mjs",

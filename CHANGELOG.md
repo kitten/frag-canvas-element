@@ -1,5 +1,14 @@
 # frag-canvas
 
+## 0.1.3
+
+### Patch Changes
+
+- Skip loading `<img>` as texture on every frame and skip on repeats
+  Submitted by [@kitten](https://github.com/kitten) (See [#6](https://github.com/kitten/frag-canvas-element/pull/6))
+- Pause rendering when element isn't visible
+  Submitted by [@kitten](https://github.com/kitten) (See [#5](https://github.com/kitten/frag-canvas-element/pull/5))
+
 ## 0.1.2
 
 ### Patch Changes
