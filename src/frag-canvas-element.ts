@@ -1,21 +1,25 @@
 const VS_SOURCE_100 =
-  'attribute vec2 vPos;\n'
-    + 'void main() {\n'
-    + '  gl_Position = vec4(vPos, 0.0, 1.0);\n'
-    + '}';
+  'attribute vec2 vPos;\n' +
+  'void main() {\n' +
+  '  gl_Position = vec4(vPos, 0.0, 1.0);\n' +
+  '}';
 const VS_SOURCE_300 =
-  '#version 300 es\n'
-    + 'in vec4 vPos;\n'
-    + 'void main() {\n'
-    + '  gl_Position = vPos;\n'
-    + '}';
+  '#version 300 es\n' +
+  'in vec4 vPos;\n' +
+  'void main() {\n' +
+  '  gl_Position = vPos;\n' +
+  '}';
 
 const makeDateVector = () => {
   const DATE = new Date();
   const year = DATE.getFullYear();
   const month = DATE.getMonth() + 1;
   const day = DATE.getDate();
-  const time = DATE.getHours() * 60 * 60 + DATE.getMinutes() * 60 + DATE.getSeconds() + DATE.getMilliseconds() * 0.001;
+  const time =
+    DATE.getHours() * 60 * 60 +
+    DATE.getMinutes() * 60 +
+    DATE.getSeconds() +
+    DATE.getMilliseconds() * 0.001;
   return [year, month, day, time] as const;
 };
 
@@ -78,26 +82,26 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
       gl.useProgram(program);
 
       if (source) {
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        gl.texImage2D(
+          gl.TEXTURE_2D,
+          0,
+          gl.RGBA,
+          gl.RGBA,
+          gl.UNSIGNED_BYTE,
+          source
+        );
         if (iChannelResolution)
           gl.uniform3fv(iChannelResolution, [width, height, 0]);
       } else {
-        if (iChannelResolution)
-          gl.uniform3fv(iChannelResolution, [0, 0, 0]);
+        if (iChannelResolution) gl.uniform3fv(iChannelResolution, [0, 0, 0]);
       }
 
-      if (iResolution)
-        gl.uniform2f(iResolution, width, height);
-      if (iTime)
-        gl.uniform1f(iTime, timestamp / 1000);
-      if (iTimeDelta)
-        gl.uniform1f(iTime, (timestamp - prevTimestamp) / 1000);
-      if (iFrame)
-        gl.uniform1f(iFrame, frameCount++);
-      if (iChannel)
-        gl.uniform1i(iChannel, 0);
-      if (iDate)
-        gl.uniform4f(iDate, ...makeDateVector());
+      if (iResolution) gl.uniform2f(iResolution, width, height);
+      if (iTime) gl.uniform1f(iTime, timestamp / 1000);
+      if (iTimeDelta) gl.uniform1f(iTime, (timestamp - prevTimestamp) / 1000);
+      if (iFrame) gl.uniform1f(iFrame, frameCount++);
+      if (iChannel) gl.uniform1i(iChannel, 0);
+      if (iDate) gl.uniform4f(iDate, ...makeDateVector());
 
       gl.enableVertexAttribArray(vertexPos);
       gl.vertexAttribPointer(vertexPos, 2, gl.FLOAT, false, 0, 0);
@@ -105,8 +109,8 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
     },
 
     updateViewport(newWidth: number, newHeight: number) {
-      gl.canvas.width = (width = newWidth);
-      gl.canvas.height = (height = newHeight);
+      gl.canvas.width = width = newWidth;
+      gl.canvas.height = height = newHeight;
       gl.viewport(0, 0, width, height);
     },
 
@@ -115,7 +119,9 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
       gl.shaderSource(fragShader, fragSource);
       gl.compileShader(fragShader);
 
-      const vertShader = /\s+#version 300/i.test(fragSource) ? vertShader300 : vertShader100;
+      const vertShader = /\s+#version 300/i.test(fragSource)
+        ? vertShader300
+        : vertShader100;
       gl.attachShader(program, vertShader);
       gl.attachShader(program, fragShader);
 
@@ -147,7 +153,7 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
 class FragCanvas extends HTMLElement implements HTMLCanvasElement {
   static observedAttributes = [];
 
-  private state: ReturnType<typeof createState> | null;
+  private state: ReturnType<typeof createState> | null = null;
   private input: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement;
   private output: HTMLCanvasElement;
 
@@ -157,7 +163,7 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
     }
   });
 
-  #resizeObserver = new ResizeObserver((entries) => {
+  #resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (this.state && entry) {
       const width = entry.devicePixelContentBoxSize[0].inlineSize;
@@ -178,22 +184,38 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
     const sheet = new CSSStyleSheet();
     sheet.insertRule(':host([hidden]) { display: none; }');
     sheet.insertRule(':host { display: block; position: relative; }');
-    sheet.insertRule(':host * { position: absolute; width: 100%; height: 100%; }');
+    sheet.insertRule(
+      ':host * { position: absolute; width: 100%; height: 100%; }'
+    );
     sheet.insertRule(':host *:not(:last-child) { visibility: hidden; }');
 
     const shadow = this.attachShadow({ mode: 'closed' });
     const output = (this.output = document.createElement('canvas'));
-    const input = (this.input = (this.querySelector(':not(canvas, script)') || document.createElement('canvas')));
+    const input = (this.input =
+      this.querySelector(':not(canvas, script)') ||
+      document.createElement('canvas'));
 
     shadow.adoptedStyleSheets = [sheet];
     shadow.appendChild(input);
     shadow.appendChild(output);
   }
 
-  getContext(contextId: '2d', options?: CanvasRenderingContext2DSettings): CanvasRenderingContext2D | null;
-  getContext(contextId: 'bitmaprenderer', options?: ImageBitmapRenderingContextSettings): ImageBitmapRenderingContext | null;
-  getContext(contextId: 'webgl', options?: WebGLContextAttributes): WebGLRenderingContext | null;
-  getContext(contextId: 'webgl2', options?: WebGLContextAttributes): WebGL2RenderingContext | null;
+  getContext(
+    contextId: '2d',
+    options?: CanvasRenderingContext2DSettings
+  ): CanvasRenderingContext2D | null;
+  getContext(
+    contextId: 'bitmaprenderer',
+    options?: ImageBitmapRenderingContextSettings
+  ): ImageBitmapRenderingContext | null;
+  getContext(
+    contextId: 'webgl',
+    options?: WebGLContextAttributes
+  ): WebGLRenderingContext | null;
+  getContext(
+    contextId: 'webgl2',
+    options?: WebGLContextAttributes
+  ): WebGL2RenderingContext | null;
 
   getContext(contextId: string, options?: any) {
     if (!(this.input instanceof HTMLCanvasElement)) {
@@ -222,7 +244,9 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
   }
 
   transferControlToOffscreen(): OffscreenCanvas {
-    return (this.input instanceof HTMLCanvasElement ? this.input : this.output).transferControlToOffscreen();
+    return (
+      this.input instanceof HTMLCanvasElement ? this.input : this.output
+    ).transferControlToOffscreen();
   }
 
   get autoresize() {
@@ -281,7 +305,9 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
       cancelAnimationFrame(this.#frameID);
       this.#frameID = undefined;
     }
-    this.#frameID = requestAnimationFrame(function draw(timestamp: DOMHighResTimeStamp) {
+    this.#frameID = requestAnimationFrame(function draw(
+      timestamp: DOMHighResTimeStamp
+    ) {
       if (self.state) {
         self.state.draw(self.input, timestamp);
         self.#frameID = requestAnimationFrame(draw);
@@ -304,7 +330,10 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
 
     const state = (this.state = gl && createState(gl, init));
     if (state) {
-      this.#mutationObserver.observe(this, { subtree: true, characterData: true });
+      this.#mutationObserver.observe(this, {
+        subtree: true,
+        characterData: true,
+      });
       this.#resizeObserver.observe(this, { box: 'device-pixel-content-box' });
       this.#rescheduleDraw();
     }
