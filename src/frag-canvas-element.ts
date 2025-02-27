@@ -1,3 +1,5 @@
+import { trackVisibility, trackResizes, trackTextUpdates } from './observers';
+
 const VERSION_300 = '#version 300 es';
 
 const VS_SOURCE_100 =
@@ -221,32 +223,13 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
 }
 
 class FragCanvas extends HTMLElement implements HTMLCanvasElement {
-  static observedAttributes = [];
+  static observedAttributes = ['pause'];
 
+  private subscriptions: (() => void)[] = [];
   private state: ReturnType<typeof createState> | null = null;
   private input: HTMLCanvasElement | HTMLImageElement | HTMLVideoElement;
   private output: HTMLCanvasElement;
-
-  #mutationObserver = new MutationObserver(() => {
-    if (this.state) {
-      this.state.updateFragShader(this.source);
-    }
-  });
-
-  #resizeObserver = new ResizeObserver(entries => {
-    const entry = entries[0];
-    if (this.state && entry) {
-      const width = entry.devicePixelContentBoxSize[0].inlineSize;
-      const height = entry.devicePixelContentBoxSize[0].blockSize;
-      if (this.autoresize) {
-        this.input.width = width;
-        this.input.height = height;
-      }
-      this.state.updateViewport(width, height);
-      this.state.drawImmediate();
-      this.#rescheduleDraw();
-    }
-  });
+  public pause: boolean = false;
 
   constructor() {
     super();
@@ -375,17 +358,21 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
       cancelAnimationFrame(this.#frameID);
       this.#frameID = undefined;
     }
-    this.#frameID = requestAnimationFrame(function draw(
-      timestamp: DOMHighResTimeStamp
-    ) {
-      if (self.state) {
-        self.state.draw(self.input, timestamp);
-        self.#frameID = requestAnimationFrame(draw);
-      }
-    });
+    if (!this.pause) {
+      this.#frameID = requestAnimationFrame(function draw(
+        timestamp: DOMHighResTimeStamp
+      ) {
+        if (self.state && !self.pause) {
+          self.state.draw(self.input, timestamp);
+          self.#frameID = requestAnimationFrame(draw);
+        }
+      });
+    }
   }
 
   connectedCallback() {
+    this.pause = !!this.getAttribute('pause');
+
     const gl = this.output.getContext('webgl2', {
       alpha: true,
       desynchronized: true,
@@ -400,18 +387,44 @@ class FragCanvas extends HTMLElement implements HTMLCanvasElement {
 
     const state = (this.state = gl && createState(gl, init));
     if (state) {
-      this.#mutationObserver.observe(this, {
-        subtree: true,
-        characterData: true,
-      });
-      this.#resizeObserver.observe(this, { box: 'device-pixel-content-box' });
+      this.subscriptions.push(
+        trackResizes(this, entry => {
+          const { inlineSize: width, blockSize: height } = entry;
+          if (this.autoresize) {
+            this.input.width = width;
+            this.input.height = height;
+          }
+          state.updateViewport(width, height);
+          state.drawImmediate();
+          this.#rescheduleDraw();
+        }),
+        trackTextUpdates(this, () => {
+          state.updateFragShader(this.source);
+        }),
+        trackVisibility(this, isVisible => {
+          this.pause = !isVisible;
+          this.#rescheduleDraw();
+        })
+      );
+      this.#rescheduleDraw();
+    }
+  }
+
+  attributeChangedCallback(
+    name: string,
+    _oldValue: unknown,
+    newValue: unknown
+  ) {
+    if (name === 'pause') {
+      this.pause = !!newValue;
       this.#rescheduleDraw();
     }
   }
 
   disconnectedCallback() {
-    this.#mutationObserver.disconnect();
-    this.#resizeObserver.disconnect();
+    this.pause = true;
+    this.subscriptions.forEach(unsubscribe => unsubscribe());
+    this.subscriptions.length = 0;
     if (this.#frameID !== undefined) {
       cancelAnimationFrame(this.#frameID);
       this.#frameID = undefined;
