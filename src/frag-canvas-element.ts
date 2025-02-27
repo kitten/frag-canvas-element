@@ -25,16 +25,37 @@ const makeDateVector = () => {
   return [year, month, day, time] as const;
 };
 
-const preprocessShader = (source: string, isES300: boolean) => {
+const preprocessShader = (source: string) => {
   let header = '';
-  let output = source;
-
+  let output = source.trim();
+  let isES300 = false;
   if (output.startsWith(VERSION_300)) {
+    isES300 = true;
     output = output.slice(VERSION_300.length + 1);
     header += `${VERSION_300}\n`;
   }
 
   if (!/^\s*precision /.test(output)) header += 'precision highp float;\n';
+
+  if (!/main\s*\(/.test(output)) {
+    const ioRe = /\(\s*out\s+vec4\s+(\S+)\s*,\s*in\s+vec2\s+(\S+)\s*\)/g;
+    const io = ioRe.exec(source);
+    output = output.replace(/mainImage\s*\(/, 'main(').replace(ioRe, '()');
+    if (isES300 && io) {
+      header += `out vec4 ${io[1]};\n`;
+      if (io[2] !== 'gl_FragCoord')
+        header += `#define ${io[2]} gl_FragCoord.xy\n`;
+    } else if (io) {
+      if (io[1] !== 'gl_FragColor') header += `#define ${io[1]} gl_FragColor\n`;
+      if (io[2] !== 'gl_FragCoord')
+        header += `#define ${io[2]} gl_FragCoord.xy\n`;
+    }
+  }
+
+  if (isES300 && output.includes('gl_FragColor')) {
+    header += 'out vec4 aFragColor;\n';
+    header += '#define glFragColor aFragColor.xy\n';
+  }
 
   if (output.includes('iChannel0')) header += 'uniform sampler2D iChannel0;\n';
   if (output.includes('iResolution')) header += 'uniform vec2 iResolution;\n';
@@ -46,24 +67,12 @@ const preprocessShader = (source: string, isES300: boolean) => {
   if (output.includes('iChannel')) header += 'uniform float iChannel;\n';
   if (output.includes('iDate')) header += 'uniform vec4 iDate;\n';
 
-  if (isES300 && output.includes('gl_FragColor'))
-    header += 'out vec4 gl_FragColor;\n';
-  if (isES300 && output.includes('gl_FragCoord'))
-    header += 'in vec2 gl_FragCoord;\n';
+  if (isES300) output = output.replace(/texture2D\s*\(/g, 'texture(');
 
-  if (!/main\s*\(/.test(output)) {
-    const ioRe = /\(\s*out\s+vec4\s+(\S+)\s*,\s*in\s+vec2\s+(\S+)\s*\)/g;
-    const io = ioRe.exec(source);
-    output = output.replace(/mainImage\s*\(/, 'main(').replace(ioRe, '()');
-    if (io && io[1] !== 'gl_FragColor')
-      header += `#define ${io[1]} gl_FragColor\n`;
-    if (io && io[2] !== 'gl_FragCoord')
-      header += `#define ${io[2]} gl_FragCoord.xy\n`;
-  }
-
-  if (!isES300) output = output.replace(/texture\s+\(/g, 'texture2D(');
-
-  return `${header}\n${output}`;
+  return {
+    source: `${header}\n${output}`,
+    isES300,
+  };
 };
 
 interface InitState {
@@ -158,11 +167,10 @@ function createState(gl: WebGL2RenderingContext, init: InitState) {
     },
 
     updateFragShader(fragSource: string) {
-      fragSource = fragSource.trim();
-      const isES300 = /\s+#version 300/i.test(fragSource);
-      gl.shaderSource(fragShader, preprocessShader(fragSource, isES300));
+      const preprocessed = preprocessShader(fragSource);
+      gl.shaderSource(fragShader, preprocessed.source);
       gl.compileShader(fragShader);
-      const vertShader = isES300 ? vertShader300 : vertShader100;
+      const vertShader = preprocessed.isES300 ? vertShader300 : vertShader100;
       gl.attachShader(program, vertShader);
       gl.attachShader(program, fragShader);
 
