@@ -54,7 +54,7 @@ const preprocessShader = (source: string) => {
 
   if (isES300 && output.includes('gl_FragColor')) {
     header += 'out vec4 aFragColor;\n';
-    header += '#define glFragColor aFragColor.xy\n';
+    header += '#define gl_FragColor aFragColor.xy\n';
   }
 
   if (output.includes('iChannel0')) header += 'uniform sampler2D iChannel0;\n';
